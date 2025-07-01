@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to check EPICS PVs in mediaSeverity.STATUSEXT file and print those with non-zero values
+# Script to check EPICS PVs in mediaSeverity.STATUSEXT file and print all values
 # Usage: ./check_pv_severity.sh
 
 # Check if the file exists
@@ -15,10 +15,11 @@ if ! command -v caget &> /dev/null; then
     exit 1
 fi
 
-echo "Checking EPICS PVs in mediaSeverity.STATUSEXT for non-zero values..."
+echo "Checking EPICS PVs in mediaSeverity.STATUSEXT for all values..."
 echo "================================================================"
 
-# Counter for non-zero PVs
+# Counter for successful reads and non-zero values
+success_count=0
 non_zero_count=0
 
 # Read each line from the file and check the PV value
@@ -31,18 +32,20 @@ while IFS= read -r pv_name; do
     # Remove any leading/trailing whitespace
     pv_name=$(echo "$pv_name" | xargs)
     
-    # Get the PV value using caget
-    # -t flag for timeout, -w flag for wait, -d flag for data type
-    pv_value=$(caget -t -w 1.0 "$pv_name" 2>/dev/null)
+    # Get the PV value using caget with numeric output
+    # -n flag for numeric value, -t flag for timeout, -w flag for wait
+    pv_value=$(caget -n -t -w 1.0 "$pv_name" 2>/dev/null)
     
     # Check if caget was successful
     if [ $? -eq 0 ]; then
-        # Extract just the value (remove PV name and timestamp)
-        value=$(echo "$pv_value" | awk '{print $2}')
+        # For caget -n, the output is just the numeric value
+        value=$(echo "$pv_value" | tr -d ' ')
         
-        # Check if value is numeric and non-zero
-        if [[ "$value" =~ ^[0-9]+\.?[0-9]*$ ]] && [ "$(echo "$value != 0" | bc -l 2>/dev/null)" -eq 1 ]; then
-            echo "NON-ZERO: $pv_name = $value"
+        ((success_count++))
+        
+        # Count non-zero values and print only those
+        if [ "$value" != "0" ]; then
+            echo "$pv_name = $value"
             ((non_zero_count++))
         fi
     else
@@ -51,5 +54,6 @@ while IFS= read -r pv_name; do
 done < "mediaSeverity.STATUSEXT"
 
 echo "================================================================"
-echo "Summary: Found $non_zero_count PV(s) with non-zero values"
+echo "Summary: Successfully read $success_count PV(s)"
+echo "Non-zero PV values: $non_zero_count"
 echo "Script completed." 
