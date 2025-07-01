@@ -30,12 +30,23 @@ done
 
 # Function to dynamically discover STATUSEXT PVs
 discover_statusext_pvs() {
-    echo "Discovering STATUSEXT PVs from EPICS applications..."
-    grep -r :STATUSEXT /home/controls/bl11a/applications 2>/dev/null | grep record | cut -f2 -d" " | sed 's/\"//g' | sed 's/)//g' | sort -u
+    # Convert BL environment variable to lowercase for path
+    beamline=$(echo "$BL" | awk '{print tolower($0)}')
+    
+    echo "Discovering STATUSEXT PVs from EPICS applications..." >&2
+    echo "Using beamline path: /home/controls/$beamline/applications" >&2
+    
+    grep -r :STATUSEXT /home/controls/$beamline/applications 2>/dev/null | grep record | cut -f2 -d" " | sed 's/\"//g' | sed 's/)//g' | sort -u
 }
 
 # Check if using dynamic discovery or file
 if [ "$dynamic_discovery" = true ]; then
+    # Check if BL environment variable is set
+    if [ -z "$BL" ]; then
+        echo "Error: BL environment variable not set. Please set BL to your beamline name (e.g., export BL=BL11A)"
+        exit 1
+    fi
+    
     echo "Using dynamic discovery of STATUSEXT PVs..."
     pv_list=$(discover_statusext_pvs)
     if [ -z "$pv_list" ]; then
